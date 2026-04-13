@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Live ICU Health Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>ICU Live Health Monitoring</header>
+
+    <div class="dashboard">
+        <div class="card" id="hr-card">
+            <h2 id="hr-value">--</h2>
+            <p>Heart Rate</p>
+        </div>
+        <div class="card" id="spo2-card">
+            <h2 id="spo2-value">--</h2>
+            <p>SpO2</p>
+        </div>
+        <div class="card" id="status-card">
+            <h2 id="status-value">--</h2>
+            <p>Status</p>
+        </div>
+    </div>
+
+    <div id="chart-container">
+        <canvas id="vitals-chart" width="900" height="400"></canvas>
+    </div>
+
+    <table id="readings-table">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Time</th>
+                <th>Heart Rate</th>
+                <th>SpO2</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const hrCard = document.getElementById("hr-card");
+        const spo2Card = document.getElementById("spo2-card");
+        const statusCard = document.getElementById("status-card");
+        const hrValue = document.getElementById("hr-value");
+        const spo2Value = document.getElementById("spo2-value");
+        const statusValue = document.getElementById("status-value");
+        const tableBody = document.querySelector("#readings-table tbody");
+
+        let readings = [];
+        const maxPoints = 20;
+
+        const ctx = document.getElementById("vitals-chart").getContext("2d");
+        const vitalsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Heart Rate', borderColor: 'cyan', backgroundColor: 'rgba(0,255,255,0.2)', data: [], tension: 0.3, fill: true },
+                    { label: 'SpO2', borderColor: 'lime', backgroundColor: 'rgba(0,255,0,0.2)', data: [], tension: 0.3, fill: true }
+                ]
+            },
+            options: {
+                animation: { duration: 500 },
+                responsive: true,
+                plugins: { legend: { labels: { color: "#00ffff" } } },
+                scales: {
+                    x: { ticks: { color: "#f0f0f0" }, grid: { color: "#333" } },
+                    y: { beginAtZero: true, ticks: { color: "#f0f0f0" }, grid: { color: "#333" } }
+                }
+            }
+        });
+
+        async function fetchReadings() {
+            try {
+                const res = await fetch("/readings");
+                const data = await res.json();
+                if (data.length > readings.length) {
+                    const newReadings = data.slice(readings.length);
+                    newReadings.forEach((r, i) => addReading(r, readings.length + i + 1));
+                    readings = data;
+                }
+            } catch (e) { console.error("Error fetching readings:", e); }
+        }
+
+        function addReading(r, index) {
+            const time = r.time.split(' ')[1];
+            const hr = r.heart_rate;
+            const spo2 = r.spo2;
+            const status = r.status;
+
+            hrValue.textContent = hr;
+            spo2Value.textContent = spo2;
+            statusValue.textContent = status;
+
+            hrCard.classList.toggle("alert", hr<60 || hr>100);
+            spo2Card.classList.toggle("alert", spo2<95);
+            statusCard.classList.toggle("alert", hr<60||hr>100||spo2<95);
+
+            const row = document.createElement("tr");
+            if(hr<60||hr>100||spo2<95) row.classList.add("alert-row");
+            row.innerHTML = `<td>${index}</td><td>${time}</td><td>${hr}</td><td>${spo2}</td><td>${status}</td>`;
+            tableBody.prepend(row);
+            if(tableBody.rows.length>10) tableBody.deleteRow(-1);
+
+            vitalsChart.data.labels.push(time);
+            vitalsChart.data.datasets[0].data.push(hr);
+            vitalsChart.data.datasets[1].data.push(spo2);
+
+            if(vitalsChart.data.labels.length>maxPoints){
+                vitalsChart.data.labels.shift();
+                vitalsChart.data.datasets.forEach(ds=>ds.data.shift());
+            }
+            vitalsChart.update();
+        }
+
+        setInterval(fetchReadings, 2000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Web Framework
+Flask==3.0.3
+flask-cors==4.0.1
+
+# Serial Communication (Arduino)
+pyserial==3.5
+
+# Data Handling
+pandas==2.2.2
+numpy==1.26.4
+
+# Machine Learning / Prediction
+scikit-learn==1.5.0
+joblib==1.4.2
+
+# PDF Generation
+reportlab==4.2.0
+
+# HTTP Requests (if using APIs)
+requests==2.32.3
+
+# Date & Time handling (optional but safe)
+python-dateutil==2.9.0.post0

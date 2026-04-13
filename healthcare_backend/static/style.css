@@ -1,0 +1,73 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #000000;
+    color: #00ffff;
+}
+header {
+    background: #111111;
+    padding: 20px;
+    text-align: center;
+    font-size: 28px;
+    font-weight: bold;
+    color: #00ffff;
+    text-shadow: 0 0 10px #00ffff;
+}
+.dashboard {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    margin: 20px;
+}
+.card {
+    background: #111111;
+    padding: 20px;
+    margin: 10px;
+    border-radius: 12px;
+    flex: 1 1 200px;
+    text-align: center;
+    box-shadow: 0 0 20px #00ffff50;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.card h2 {
+    font-size: 50px;
+    margin: 10px 0;
+}
+.card p {
+    font-size: 18px;
+    margin: 0;
+    color: #00ffcc;
+}
+.card.alert {
+    animation: blink 1s infinite;
+    box-shadow: 0 0 30px #ff0000;
+}
+@keyframes blink {
+    0%, 50%, 100% { background-color: #111; color: #ff4d4d; }
+    25%, 75% { background-color: #111; color: #ffffff; }
+}
+table {
+    width: 90%;
+    margin: 20px auto;
+    border-collapse: collapse;
+    background: #111;
+    border-radius: 12px;
+    overflow: hidden;
+}
+th, td { padding: 12px; text-align: center; }
+th { background: #0066ff; color: #fff; }
+tr:nth-child(even) { background: #111; }
+tr.alert-row { background: #ff4d4d !important; color: #fff; animation: rowBlink 1s infinite; }
+@keyframes rowBlink {
+    0%,50%,100% { background-color: #ff4d4d; }
+    25%,75% { background-color: #990000; }
+}
+#chart-container {
+    width: 90%;
+    margin: 20px auto;
+}
+canvas {
+    background: #111;
+    border-radius: 12px;
+    box-shadow: 0 0 20px #00ffff50;
+}
