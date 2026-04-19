@@ -14,13 +14,12 @@ This project focuses on building a smart healthcare monitoring system that class
 
 ---
 """
-
 # -*- coding: utf-8 -*-
 
 # BioTrack: Smart Healthcare Monitoring System using HR & SpO₂
 """
 Machine Learning + Rule-based safety logic for health classification.
-Fixed for Cloud Deployment (Render).
+Fixed for Cloud Deployment (Render) with Lazy Loading.
 """
 
 import pandas as pd
@@ -34,37 +33,20 @@ from sklearn.metrics import accuracy_score
 
 # Dataset files configuration
 files = [
-    ("s10_sit","Sit","S10"),
-    ("s10_walk","Walk","S10"),
-    ("s10_run","Run","S10"),
-    ("s11_sit","Sit","S11"),
-    ("s11_walk","Walk","S11"),
-    ("s11_run","Run","S11"),
-    ("s12_sit","Sit","S12"),
-    ("s12_walk","Walk","S12"),
-    ("s12_run","Run","S12"),
+    ("s10_sit","Sit","S10"), ("s10_walk","Walk","S10"), ("s10_run","Run","S10"),
+    ("s11_sit","Sit","S11"), ("s11_walk","Walk","S11"), ("s11_run","Run","S11"),
+    ("s12_sit","Sit","S12"), ("s12_walk","Walk","S12"), ("s12_run","Run","S12"),
 ]
 
-data = []
+# Global model variable to allow lazy loading
+model = None
 
 def extract_meta(file):
-    """
-    FIXED: Extract HR and SpO2 from .hea files.
-    Checks if file exists to prevent crashing on cloud servers like Render.
-    """
     file_path = os.path.join("data", f"{file}.hea")
-    
-    # Check if the data file exists
     if not os.path.exists(file_path):
-        # Fallback values for training if files are missing on GitHub
-        defaults = {
-            "sit": (72, 98),
-            "walk": (95, 97),
-            "run": (145, 95)
-        }
+        defaults = {"sit": (72, 98), "walk": (95, 97), "run": (145, 95)}
         activity_type = file.split("_")[1]
         return defaults.get(activity_type, (75, 98))
-
     try:
         with open(file_path, "r") as f:
             text = f.read()
@@ -72,92 +54,64 @@ def extract_meta(file):
         spo2 = int(re.search(r'spo2_start>: (\d+)', text).group(1))
         return hr, spo2
     except Exception:
-        return 75, 98  # Fallback defaults on read error
+        return 75, 98
 
-# 1. Create Base Dataset
-for file, activity, subject in files:
-    hr, spo2 = extract_meta(file)
-    data.append([subject, activity, hr, spo2])
+def train_model():
+    """Trains the model only when first called to prevent startup timeout"""
+    global model
+    print("🔄 Starting BioTrack Model Training...")
+    data = []
+    for file, activity, subject in files:
+        hr, spo2 = extract_meta(file)
+        data.append([subject, activity, hr, spo2])
 
-df = pd.DataFrame(data, columns=["Subject","Activity","HR","SpO2"])
-df = df.drop_duplicates().reset_index(drop=True)
+    df = pd.DataFrame(data, columns=["Subject","Activity","HR","SpO2"])
+    df = df.drop_duplicates().reset_index(drop=True)
 
-# 2. Data Expansion & Realistic Noise
-df_expanded = pd.concat([df]*50, ignore_index=True)
-df_expanded['HR'] += np.random.normal(0, 5, len(df_expanded))
-df_expanded['SpO2'] += np.random.normal(0, 1, len(df_expanded))
+    df_expanded = pd.concat([df]*50, ignore_index=True)
+    df_expanded['HR'] += np.random.normal(0, 5, len(df_expanded))
+    df_expanded['SpO2'] += np.random.normal(0, 1, len(df_expanded))
+    df_expanded['HR'] = df_expanded['HR'].clip(40, 180)
+    df_expanded['SpO2'] = df_expanded['SpO2'].clip(80, 100)
 
-# Clip values to realistic human range
-df_expanded['HR'] = df_expanded['HR'].clip(40, 180)
-df_expanded['SpO2'] = df_expanded['SpO2'].clip(80, 100)
-
-# 3. FIXED LABELING LOGIC
-def label(row):
-    """
-    Classifies data for training. 
-    Matches the medical standards used in the PDF report.
-    """
-    if row['SpO2'] < 95:
-        return "Abnormal"
-    elif row['HR'] > 100 or row['HR'] < 60:
-        return "Abnormal"
-    else:
+    def label(row):
+        if row['SpO2'] < 95 or row['HR'] > 100 or row['HR'] < 60:
+            return "Abnormal"
         return "Normal"
 
-df_expanded['Label'] = df_expanded.apply(label, axis=1)
+    df_expanded['Label'] = df_expanded.apply(label, axis=1)
+    
+    # Borderline & Synthetic Data
+    borderline = []
+    for _ in range(100):
+        borderline.append(["Border","Mixed", np.random.randint(95, 105), np.random.randint(94, 96), np.random.choice(["Normal","Abnormal"])])
+    df_border = pd.DataFrame(borderline, columns=["Subject","Activity","HR","SpO2","Label"])
 
-# 4. Adding Borderline & Synthetic Abnormal Data
-borderline = []
-for _ in range(100):
-    hr = np.random.randint(95, 105) 
-    spo2 = np.random.randint(94, 96) 
-    lbl = np.random.choice(["Normal","Abnormal"])
-    borderline.append(["Border","Mixed", hr, spo2, lbl])
+    abnormal_data = []
+    for _ in range(150):
+        abnormal_data.append(["Synthetic","Critical", np.random.randint(110, 160), np.random.randint(85, 93), "Abnormal"])
+    df_abnormal = pd.DataFrame(abnormal_data, columns=["Subject","Activity","HR","SpO2","Label"])
 
-df_border = pd.DataFrame(borderline, columns=["Subject","Activity","HR","SpO2","Label"])
+    final_df = pd.concat([df_expanded, df_border, df_abnormal], ignore_index=True)
+    
+    X = final_df[['HR','SpO2']]
+    y = final_df['Label']
+    
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X, y)
+    print("✅ BioTrack Model Training Complete!")
 
-abnormal_data = []
-for _ in range(150):
-    hr = np.random.randint(110, 160)
-    spo2 = np.random.randint(85, 93)
-    abnormal_data.append(["Synthetic","Critical", hr, spo2, "Abnormal"])
-
-df_abnormal = pd.DataFrame(abnormal_data, columns=["Subject","Activity","HR","SpO2","Label"])
-
-# 5. Final Dataset Preparation
-final_df = pd.concat([df_expanded, df_border, df_abnormal], ignore_index=True)
-
-# 6. Model Training
-X = final_df[['HR','SpO2']]
-y = final_df['Label']
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-
-# 7. REAL-TIME PREDICTION
 def predict_realtime(hr, spo2):
-    """
-    Hybrid logic: Rule-based safety first, then ML check.
-    """
-    # Clean input data
+    global model
+    if model is None:
+        train_model()
+
     hr = max(0, min(hr, 220))
     spo2 = max(0, min(spo2, 100))
 
-    # Rule-based safety: Instant Abnormal triggers
-    if spo2 < 95:
-        return "Abnormal (Low SpO2)"
-    if hr > 100:
-        return "Abnormal (High HR)"
-    if hr < 60:
-        return "Abnormal (Low HR)"
+    if spo2 < 95: return "Abnormal (Low SpO2)"
+    if hr > 100: return "Abnormal (High HR)"
+    if hr < 60: return "Abnormal (Low HR)"
 
-    # Use ML for stable/borderline readings
     input_df = pd.DataFrame([[hr, spo2]], columns=['HR','SpO2'])
     return model.predict(input_df)[0]
-
-# Sample Tests
-if __name__ == "__main__":
-    print(f"Model Accuracy: {accuracy_score(y_test, model.predict(X_test)):.2f}")
-    print(f"Testing 85 BPM, 98% SpO2: {predict_realtime(85, 98)}") # Normal
