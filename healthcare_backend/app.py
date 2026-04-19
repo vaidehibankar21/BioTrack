@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from biotrack import predict_realtime
 from database import save_reading
@@ -8,7 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
-# --- DIRECTORY SETUP ---
+# Ensure folders are found relative to this file's location
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RECORDS_DIR = os.path.join(BASE_DIR, 'records')
 
@@ -48,7 +48,6 @@ def update_vitals():
 def get_vitals():
     return jsonify(latest_vital)
 
-# This part only runs if you start the script manually
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
