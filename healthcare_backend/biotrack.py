@@ -14,6 +14,7 @@ This project focuses on building a smart healthcare monitoring system that class
 
 ---
 """
+# -*- coding: utf-8 -*-
 import pandas as pd
 import numpy as np
 import re
@@ -52,7 +53,7 @@ def train_model():
         data.append([hr, spo2])
     
     df = pd.DataFrame(data, columns=['HR','SpO2'])
-    y = df.apply(lambda r: "Abnormal" if r['SpO2'] < 95 or r['HR'] > 100 else "Normal", axis=1)
+    y = df.apply(lambda r: "Abnormal" if r['SpO2'] < 95 or r['HR'] > 100 or r['HR'] < 55 else "Normal", axis=1)
     
     model = RandomForestClassifier(n_estimators=50)
     model.fit(df, y)
@@ -62,9 +63,22 @@ def predict_realtime(hr, spo2):
     if model is None:
         train_model()
     
-    # Safety hard-rules
-    if spo2 < 95: return "Abnormal (Low SpO2)"
-    if hr > 100: return "Abnormal (High HR)"
+    # --- UPDATED LOGIC LAYER ---
+    if spo2 == 0: 
+        return "Abnormal (No Finger Detected)"
+    if spo2 < 90: 
+        return "Abnormal (Critical Low SpO2)"
+    if spo2 < 95: 
+        return "Abnormal (Low SpO2)"
+    if hr < 50: 
+        return "Abnormal (Low HR - Bradycardia)"
+    if hr > 100: 
+        return "Abnormal (High HR - Tachycardia)"
     
+    # Standard Healthy Range (Ensures "Normal" is enforced)
+    if 60 <= hr <= 100 and spo2 >= 95:
+        return "Normal"
+    
+    # If borderline, use ML model prediction
     input_df = pd.DataFrame([[hr, spo2]], columns=['HR','SpO2'])
     return model.predict(input_df)[0]
