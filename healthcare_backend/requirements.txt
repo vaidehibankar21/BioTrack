@@ -1,8 +1,9 @@
-# Web Framework
+# Web Framework & Server
 Flask==3.0.3
 flask-cors==4.0.1
+gunicorn==21.2.0
 
-# Serial Communication (Arduino)
+# Serial Communication (Needed for your local bridge.py)
 pyserial==3.5
 
 # Data Handling
@@ -16,8 +17,8 @@ joblib==1.4.2
 # PDF Generation
 reportlab==4.2.0
 
-# HTTP Requests (if using APIs)
+# HTTP Requests
 requests==2.32.3
 
-# Date & Time handling (optional but safe)
+# Date & Time handling
 python-dateutil==2.9.0.post0
