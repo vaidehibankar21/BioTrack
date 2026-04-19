@@ -2,7 +2,8 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from biotrack import predict_realtime
-from database import save_reading
+from database import save_reading, get_all_readings # Added get_all_readings
+from pdf_generator import generate_pdf_batch # Added this import
 from datetime import datetime
 
 app = Flask(__name__)
@@ -12,7 +13,6 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RECORDS_DIR = os.path.join(BASE_DIR, 'records')
 
-# Ensure the records folder exists so downloading doesn't crash
 if not os.path.exists(RECORDS_DIR):
     os.makedirs(RECORDS_DIR, exist_ok=True)
 
@@ -36,11 +36,26 @@ def update_vitals():
         status = predict_realtime(hr, spo2)
         save_reading(hr, spo2, status)
         
+        timestamp = datetime.now().strftime("%H:%M:%S")
         latest_vital = {
             'hr': hr, 'spo2': spo2, 'status': status,
-            'time': datetime.now().strftime("%H:%M:%S"),
+            'time': timestamp,
             'patient': "Kritisha Oberoi"
         }
+
+        # ✅ FIXED: Trigger PDF generation every 10 readings
+        all_data = get_all_readings()
+        if len(all_data) > 0 and len(all_data) % 10 == 0:
+            batch = all_data[-10:]
+            # Format data to match pdf_generator requirements
+            formatted_batch = [{
+                'hr': d['heart_rate'], 
+                'spo2': d['spo2'], 
+                'status': d['status'], 
+                'time': d['time']
+            } for d in batch]
+            generate_pdf_batch(formatted_batch)
+
         return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -49,7 +64,6 @@ def update_vitals():
 def get_vitals():
     return jsonify(latest_vital)
 
-# ✅ ADDED: Route for React to see the list of PDFs
 @app.route('/api/list-reports', methods=['GET'])
 def list_reports():
     try:
@@ -58,7 +72,6 @@ def list_reports():
     except Exception:
         return jsonify([])
 
-# ✅ ADDED: Route for React "View" button
 @app.route('/api/download-report/<filename>', methods=['GET'])
 def download_report(filename):
     try:
@@ -66,14 +79,12 @@ def download_report(filename):
     except Exception as e:
         return str(e), 404
 
-# ✅ ADDED: Route for React "Download Latest" button
 @app.route('/api/download-latest', methods=['GET'])
 def download_latest():
     try:
         files = [f for f in os.listdir(RECORDS_DIR) if f.endswith('.pdf')]
         if not files:
             return "No reports generated yet.", 404
-        # Get the newest file by creation time
         latest_file = max([os.path.join(RECORDS_DIR, f) for f in files], key=os.path.getctime)
         return send_from_directory(RECORDS_DIR, os.path.basename(latest_file))
     except Exception as e:
