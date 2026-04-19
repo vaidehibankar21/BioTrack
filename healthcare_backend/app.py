@@ -11,6 +11,13 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
+# --- CRITICAL FIX FOR RENDER ---
+# Move folder creation OUTSIDE of __main__ so Gunicorn creates it on startup
+RECORDS_DIR = os.path.join(os.getcwd(), 'records')
+if not os.path.exists(RECORDS_DIR):
+    os.makedirs(RECORDS_DIR)
+# -------------------------------
+
 # Global variables to store data coming from your hardware via bridge.py
 readings_buffer = []
 latest_vital = {
@@ -81,14 +88,13 @@ def get_vitals():
 
 @app.route('/api/download-latest', methods=['GET'])
 def download_latest():
-    records_dir = os.path.join(os.getcwd(), 'records')
-    if not os.path.exists(records_dir):
+    if not os.path.exists(RECORDS_DIR):
         return "Records folder not found.", 404
-    files = [f for f in os.listdir(records_dir) if f.endswith('.pdf')]
+    files = [f for f in os.listdir(RECORDS_DIR) if f.endswith('.pdf')]
     if not files:
         return "No reports found yet.", 404
     files.sort(reverse=True)
-    return send_from_directory(records_dir, files[0])
+    return send_from_directory(RECORDS_DIR, files[0])
 
 @app.route("/readings", methods=["GET"])
 def get_readings():
@@ -96,24 +102,19 @@ def get_readings():
 
 @app.route('/api/list-reports', methods=['GET'])
 def list_reports():
-    records_dir = os.path.join(os.getcwd(), 'records')
-    if not os.path.exists(records_dir):
+    if not os.path.exists(RECORDS_DIR):
         return jsonify([])
-    files = [f for f in os.listdir(records_dir) if f.endswith('.pdf')]
+    files = [f for f in os.listdir(RECORDS_DIR) if f.endswith('.pdf')]
     files.sort(reverse=True)
     return jsonify(files)
 
 @app.route('/api/download-report/<filename>', methods=['GET'])
 def download_specific_report(filename):
-    records_dir = os.path.join(os.getcwd(), 'records')
-    return send_from_directory(records_dir, filename)
+    return send_from_directory(RECORDS_DIR, filename)
 
 # ---------------- MAIN ---------------- #
 
 if __name__ == "__main__":
-    if not os.path.exists('records'):
-        os.makedirs('records')
-    
     # Render uses an environment variable for PORT
     port = int(os.environ.get("PORT", 5000))
     print(f"🚀 BioTrack Backend starting on port {port}")
