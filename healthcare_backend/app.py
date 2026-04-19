@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from biotrack import predict_realtime
 from database import save_reading
@@ -8,10 +8,11 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
-# Ensure folders are found relative to this file's location
+# --- DIRECTORY SETUP ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RECORDS_DIR = os.path.join(BASE_DIR, 'records')
 
+# Ensure the records folder exists so downloading doesn't crash
 if not os.path.exists(RECORDS_DIR):
     os.makedirs(RECORDS_DIR, exist_ok=True)
 
@@ -47,6 +48,36 @@ def update_vitals():
 @app.route('/api/vitals', methods=['GET'])
 def get_vitals():
     return jsonify(latest_vital)
+
+# ✅ ADDED: Route for React to see the list of PDFs
+@app.route('/api/list-reports', methods=['GET'])
+def list_reports():
+    try:
+        files = [f for f in os.listdir(RECORDS_DIR) if f.endswith('.pdf')]
+        return jsonify(sorted(files, reverse=True))
+    except Exception:
+        return jsonify([])
+
+# ✅ ADDED: Route for React "View" button
+@app.route('/api/download-report/<filename>', methods=['GET'])
+def download_report(filename):
+    try:
+        return send_from_directory(RECORDS_DIR, filename)
+    except Exception as e:
+        return str(e), 404
+
+# ✅ ADDED: Route for React "Download Latest" button
+@app.route('/api/download-latest', methods=['GET'])
+def download_latest():
+    try:
+        files = [f for f in os.listdir(RECORDS_DIR) if f.endswith('.pdf')]
+        if not files:
+            return "No reports generated yet.", 404
+        # Get the newest file by creation time
+        latest_file = max([os.path.join(RECORDS_DIR, f) for f in files], key=os.path.getctime)
+        return send_from_directory(RECORDS_DIR, os.path.basename(latest_file))
+    except Exception as e:
+        return str(e), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
