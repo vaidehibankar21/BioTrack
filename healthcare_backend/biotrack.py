@@ -20,7 +20,7 @@ import re
 import os
 from sklearn.ensemble import RandomForestClassifier
 
-# Use absolute paths so the server finds the 'data' folder
+# Path fix for data folder
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 files = [
@@ -34,7 +34,7 @@ model = None
 def extract_meta(file):
     file_path = os.path.join(BASE_DIR, "data", f"{file}.hea")
     if not os.path.exists(file_path):
-        return 75, 98 # Fallback if file is missing
+        return 75, 98 # Fallback
     try:
         with open(file_path, "r") as f:
             text = f.read()
@@ -52,7 +52,6 @@ def train_model():
         data.append([hr, spo2])
     
     df = pd.DataFrame(data, columns=['HR','SpO2'])
-    # Simple logic for training labels
     y = df.apply(lambda r: "Abnormal" if r['SpO2'] < 95 or r['HR'] > 100 else "Normal", axis=1)
     
     model = RandomForestClassifier(n_estimators=50)
@@ -63,7 +62,7 @@ def predict_realtime(hr, spo2):
     if model is None:
         train_model()
     
-    # Hard safety rules
+    # Safety hard-rules
     if spo2 < 95: return "Abnormal (Low SpO2)"
     if hr > 100: return "Abnormal (High HR)"
     
