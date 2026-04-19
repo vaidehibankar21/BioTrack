@@ -2,8 +2,8 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from biotrack import predict_realtime
-from database import save_reading, get_all_readings # Added get_all_readings
-from pdf_generator import generate_pdf_batch # Added this import
+from database import save_reading, get_all_readings
+from pdf_generator import generate_pdf_batch
 from datetime import datetime
 
 app = Flask(__name__)
@@ -33,7 +33,9 @@ def update_vitals():
         hr = int(data.get('hr', 0))
         spo2 = int(data.get('spo2', 0))
         
+        # Calling the improved logic
         status = predict_realtime(hr, spo2)
+        
         save_reading(hr, spo2, status)
         
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -43,11 +45,10 @@ def update_vitals():
             'patient': "Kritisha Oberoi"
         }
 
-        # ✅ FIXED: Trigger PDF generation every 10 readings
+        # PDF Trigger Logic
         all_data = get_all_readings()
         if len(all_data) > 0 and len(all_data) % 10 == 0:
             batch = all_data[-10:]
-            # Format data to match pdf_generator requirements
             formatted_batch = [{
                 'hr': d['heart_rate'], 
                 'spo2': d['spo2'], 
